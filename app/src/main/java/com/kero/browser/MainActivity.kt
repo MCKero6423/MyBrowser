@@ -41,21 +41,17 @@ class MainActivity : AppCompatActivity() {
         session.open(sRuntime!!)
         geckoView.setSession(session)
 
-        // 3. 进度条逻辑
+        // 3. 进度条
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onProgressChange(session: GeckoSession, progress: Int) {
                 runOnUiThread {
                     progressBar.progress = progress
-                    if (progress < 100) {
-                        progressBar.visibility = View.VISIBLE
-                    } else {
-                        progressBar.visibility = View.INVISIBLE
-                    }
+                    progressBar.visibility = if (progress < 100) View.VISIBLE else View.INVISIBLE
                 }
             }
         }
 
-        // 4. 地址栏同步逻辑
+        // 4. 地址栏同步
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onLocationChange(
                 session: GeckoSession, 
@@ -64,7 +60,6 @@ class MainActivity : AppCompatActivity() {
             ) {
                 if (url != null) {
                     runOnUiThread {
-                        // 只有当用户没在打字时，才更新地址栏
                         if (!urlInput.hasFocus()) {
                             urlInput.setText(url)
                         }
@@ -73,21 +68,25 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 5. 核心修复：提取统一的加载函数
+        // 5. 加载逻辑 (通用版，无弹窗)
         fun loadUrlFromInput() {
-            var url = urlInput.text.toString().trim() // 去除首尾空格
+            var url = urlInput.text.toString().trim()
             
             if (url.isNotEmpty()) {
-                // 【修复逻辑】只要没有 :// 就强制加 https://
-                // 这能同时解决 baidu.com 和 www.baidu.com 的问题
-                if (!url.contains("://")) {
+                // 【通用补全逻辑】
+                // 只要不是以标准协议开头，也不是 about: 开头，全部视为网址，强制加 HTTPS
+                if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("about:")) {
                     url = "https://"
                 }
+
+                // 填回输入框，让用户知道我们帮他补全了
+                urlInput.setText(url)
                 
+                // 加载
                 session.loadUri(url)
-                geckoView.clearFocus() // 收起键盘
                 
-                // 暂时把焦点移回 WebView，防止键盘再次弹出
+                // 收起键盘并聚焦浏览器
+                geckoView.clearFocus()
                 geckoView.requestFocus()
             }
         }
@@ -103,7 +102,7 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
-        // 后退/前进
+        // 导航按钮
         backButton.setOnClickListener { session.goBack() }
         forwardButton.setOnClickListener { session.goForward() }
 
