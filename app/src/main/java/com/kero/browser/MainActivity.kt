@@ -34,12 +34,7 @@ class MainActivity : AppCompatActivity() {
 
         // 设置导航代理，用于更新地址栏
         geckoSession.navigationDelegate = object : GeckoSession.NavigationDelegate {
-            override fun onLocationChange(
-                session: GeckoSession,
-                url: String?,
-                perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>,
-                hasUserGesture: Boolean
-            ) {
+            override fun onLocationChange(session: GeckoSession, url: String?) {
                 // 当页面URL变化时，更新地址栏
                 runOnUiThread {
                     urlEditText.setText(url ?: "")
