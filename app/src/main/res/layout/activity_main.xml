@@ -14,10 +14,10 @@
         android:padding="4dp"
         android:gravity="center_vertical">
 
-        <!-- 后退按钮 -->
+        <!-- 后退 -->
         <Button
             android:id="@+id/btn_back"
-            android:layout_width="40dp"
+            android:layout_width="35dp"
             android:layout_height="match_parent"
             android:text="&lt;"
             android:textSize="18sp"
@@ -25,17 +25,17 @@
             android:insetTop="0dp"
             android:insetBottom="0dp"/>
 
-        <!-- 前进按钮 -->
+        <!-- 前进 -->
         <Button
             android:id="@+id/btn_forward"
-            android:layout_width="40dp"
+            android:layout_width="35dp"
             android:layout_height="match_parent"
             android:text="&gt;"
             android:textSize="18sp"
             android:padding="0dp"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:layout_marginStart="4dp"/>
+            android:layout_marginStart="2dp"/>
 
         <!-- 地址栏 -->
         <EditText
@@ -43,7 +43,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:hint="输入网址..."
+            android:hint="Search or enter address"
             android:inputType="textUri"
             android:imeOptions="actionGo"
             android:background="@android:color/white"
@@ -52,16 +52,26 @@
             android:textSize="14sp"
             android:layout_marginStart="4dp"/>
 
+        <!-- 多窗口按钮 (新) -->
+        <Button
+            android:id="@+id/btn_tabs"
+            android:layout_width="40dp"
+            android:layout_height="match_parent"
+            android:text="1"
+            android:textStyle="bold"
+            android:layout_marginStart="4dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"/>
+
         <!-- 访问按钮 -->
         <Button
             android:id="@+id/go_button"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
             android:text="Go"
-            android:layout_marginStart="4dp"/>
+            android:layout_marginStart="2dp"/>
     </LinearLayout>
 
-    <!-- 进度条 (默认隐藏) -->
     <ProgressBar
         android:id="@+id/progress_bar"
         style="?android:attr/progressBarStyleHorizontal"
@@ -71,7 +81,6 @@
         android:progressDrawable="@android:drawable/progress_horizontal"
         android:visibility="invisible"/>
 
-    <!-- 浏览器内核 -->
     <org.mozilla.geckoview.GeckoView
         android:id="@+id/geckoview"
         android:layout_width="match_parent"
