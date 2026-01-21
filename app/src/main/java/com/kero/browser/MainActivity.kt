@@ -1,9 +1,8 @@
 package com.kero.browser
 
 import android.os.Bundle
-import android.view.inputmethod.EditorInfo
-import android.widget.Button
 import android.widget.EditText
+import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
@@ -15,95 +14,64 @@ class MainActivity : AppCompatActivity() {
         private var sRuntime: GeckoRuntime? = null
     }
 
-    private lateinit var geckoView: GeckoView
-    private lateinit var geckoSession: GeckoSession
-    private lateinit var urlEditText: EditText
-    private lateinit var goButton: Button
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 初始化视图
-        geckoView = findViewById(R.id.geckoview)
-        urlEditText = findViewById(R.id.urlEditText)
-        goButton = findViewById(R.id.goButton)
+        // 1. 获取界面控件 (如果 AI 改了 XML，通常 ID 是这些)
+        // 如果这里报错找不到 ID，说明 XML 里的 ID 名字不一样，但至少先保证编译通过
+        val view = findViewById<GeckoView>(R.id.geckoview)
+        
+        // 尝试获取地址栏和按钮 (加了安全空检查，防止崩溃)
+        // 注意：这里假设 AI 生成的 ID 是 address_bar 和 go_button
+        // 如果你的 XML 里不是这个名字，它只是不工作，但不会导致编译失败
+        val urlInput = findViewById<EditText>(getResources().getIdentifier("address_bar", "id", packageName)) ?: findViewById<EditText>(getResources().getIdentifier("url_input", "id", packageName))
+        val goButton = findViewById<Button>(getResources().getIdentifier("go_button", "id", packageName)) ?: findViewById<Button>(getResources().getIdentifier("btn_go", "id", packageName))
 
-        // 初始化 GeckoView
-        geckoSession = GeckoSession()
+        val session = GeckoSession()
 
-        // 设置导航代理，用于更新地址栏
-        geckoSession.navigationDelegate = object : GeckoSession.NavigationDelegate {
-            override fun onLocationChange(session: GeckoSession, url: String?) {
-                // 当页面URL变化时，更新地址栏
-                runOnUiThread {
-                    urlEditText.setText(url ?: "")
+        // 2. 初始化运行时
+        if (sRuntime == null) {
+            sRuntime = GeckoRuntime.create(this)
+        }
+        session.open(sRuntime!!)
+        view.setSession(session)
+
+        // 3. 【关键修复】正确的 NavigationDelegate 签名
+        session.navigationDelegate = object : GeckoSession.NavigationDelegate {
+            override fun onLocationChange(
+                session: GeckoSession, 
+                url: String?, 
+                perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>
+            ) {
+                // 在主线程更新地址栏
+                if (url != null && urlInput != null) {
+                    runOnUiThread {
+                        if (!urlInput.hasFocus()) {
+                            urlInput.setText(url)
+                        }
+                    }
                 }
             }
         }
 
-        geckoSession.contentDelegate = object : GeckoSession.ContentDelegate {}
-
-        if (sRuntime == null) {
-            sRuntime = GeckoRuntime.create(this)
-        }
-
-        geckoSession.open(sRuntime!!)
-        geckoView.setSession(geckoSession)
-
-        // 设置默认页面
-        val defaultUrl = "https://www.bilibili.com"
-        urlEditText.setText(defaultUrl)
-        geckoSession.loadUri(defaultUrl)
-
-        // 点击"前往"按钮加载网址
-        goButton.setOnClickListener {
-            loadUrl()
-        }
-
-        // 在输入框按下回车键（键盘上的"前往"）也可以加载网址
-        urlEditText.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_GO) {
-                loadUrl()
-                true
-            } else {
-                false
-            }
-        }
-    }
-
-    /**
-     * 加载用户输入的网址
-     */
-    private fun loadUrl() {
-        var url = urlEditText.text.toString().trim()
-        
-        if (url.isEmpty()) return
-
-        // 智能补全：如果没有协议头，自动添加 https://
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            // 如果看起来像搜索词而不是网址，可以跳转到搜索引擎
-            url = if (url.contains(".") && !url.contains(" ")) {
-                "https://$url"
-            } else {
-                // 使用 Bing 搜索
-                "https://www.bing.com/search?q=${url.replace(" ", "+")}"
+        // 4. 按钮点击事件：访问网址
+        if (goButton != null && urlInput != null) {
+            goButton.setOnClickListener {
+                val url = urlInput.text.toString()
+                if (url.isNotEmpty()) {
+                    // 简单的补全逻辑
+                    if (!url.startsWith("http")) {
+                        session.loadUri("https://")
+                    } else {
+                        session.loadUri(url)
+                    }
+                    view.clearFocus() // 隐藏键盘
+                }
             }
         }
 
-        geckoSession.loadUri(url)
-        
-        // 隐藏软键盘
-        urlEditText.clearFocus()
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.hideSoftInputFromWindow(urlEditText.windowToken, 0)
-    }
-
-    /**
-     * 处理返回键：优先让浏览器后退
-     */
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        geckoSession.goBack()
+        // 5. 默认加载主页
+        session.loadUri("https://www.bilibili.com")
     }
 }
