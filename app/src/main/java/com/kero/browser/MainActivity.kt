@@ -17,14 +17,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var session: GeckoSession
+    private lateinit var urlInput: EditText
+    private lateinit var geckoView: GeckoView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         // 1. 获取控件
-        val view = findViewById<GeckoView>(R.id.geckoview)
-        val urlInput = findViewById<EditText>(R.id.address_bar)
+        geckoView = findViewById(R.id.geckoview)
+        urlInput = findViewById(R.id.address_bar)
         val goButton = findViewById<Button>(R.id.go_button)
         val backButton = findViewById<Button>(R.id.btn_back)
         val forwardButton = findViewById<Button>(R.id.btn_forward)
@@ -37,9 +39,9 @@ class MainActivity : AppCompatActivity() {
             sRuntime = GeckoRuntime.create(this)
         }
         session.open(sRuntime!!)
-        view.setSession(session)
+        geckoView.setSession(session)
 
-        // 3. 监听网页加载进度 (进度条逻辑)
+        // 3. 进度条逻辑
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onProgressChange(session: GeckoSession, progress: Int) {
                 runOnUiThread {
@@ -53,7 +55,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 4. 监听地址栏变化
+        // 4. 地址栏同步逻辑
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onLocationChange(
                 session: GeckoSession, 
@@ -62,6 +64,7 @@ class MainActivity : AppCompatActivity() {
             ) {
                 if (url != null) {
                     runOnUiThread {
+                        // 只有当用户没在打字时，才更新地址栏
                         if (!urlInput.hasFocus()) {
                             urlInput.setText(url)
                         }
@@ -70,48 +73,46 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 5. 按钮点击事件
-        goButton.setOnClickListener {
-            var url = urlInput.text.toString().trim()
+        // 5. 核心修复：提取统一的加载函数
+        fun loadUrlFromInput() {
+            var url = urlInput.text.toString().trim() // 去除首尾空格
+            
             if (url.isNotEmpty()) {
-                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                // 【修复逻辑】只要没有 :// 就强制加 https://
+                // 这能同时解决 baidu.com 和 www.baidu.com 的问题
+                if (!url.contains("://")) {
                     url = "https://"
                 }
+                
                 session.loadUri(url)
-                view.clearFocus()
+                geckoView.clearFocus() // 收起键盘
+                
+                // 暂时把焦点移回 WebView，防止键盘再次弹出
+                geckoView.requestFocus()
             }
         }
 
-        // 后退按钮
-        backButton.setOnClickListener {
-            session.goBack()
+        // 按钮点击
+        goButton.setOnClickListener {
+            loadUrlFromInput()
         }
 
-        // 前进按钮
-        forwardButton.setOnClickListener {
-            session.goForward()
-        }
-        
-        // 键盘回车跳转
+        // 键盘回车
         urlInput.setOnEditorActionListener { _, _, _ ->
-            goButton.performClick()
+            loadUrlFromInput()
             true
         }
+
+        // 后退/前进
+        backButton.setOnClickListener { session.goBack() }
+        forwardButton.setOnClickListener { session.goForward() }
 
         // 默认主页
         session.loadUri("https://www.bilibili.com")
     }
 
-    // 6. 系统返回键逻辑 (核心：网页后退 vs 关闭APP)
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // 简单的尝试调用 goBack，如果不能后退，GeckoView 内部状态管理比较复杂
-        // 这里做一个简单的处理：直接调用 goBack
-        // 理想情况应该检查 session.historyState，但为了代码精简，我们先无脑调
-        // 如果想关闭 App，用户可以连续按两次，或者我们之后再优化
-        session.goBack() 
-        // 注意：这里没有调用 super.onBackPressed()，所以按返回键默认就是尝试网页后退
-        // 如果网页退无可退，GeckoSession 不会做什么，界面会停住。
-        // *下一版本* 我们可以优化成 "退无可退则关闭App"
+        session.goBack()
     }
 }
