@@ -24,7 +24,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. 获取控件
         geckoView = findViewById(R.id.geckoview)
         urlInput = findViewById(R.id.address_bar)
         val goButton = findViewById<Button>(R.id.go_button)
@@ -34,14 +33,12 @@ class MainActivity : AppCompatActivity() {
 
         session = GeckoSession()
 
-        // 2. 初始化 Runtime
         if (sRuntime == null) {
             sRuntime = GeckoRuntime.create(this)
         }
         session.open(sRuntime!!)
         geckoView.setSession(session)
 
-        // 3. 进度条
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onProgressChange(session: GeckoSession, progress: Int) {
                 runOnUiThread {
@@ -51,13 +48,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 4. 地址栏同步
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
-            override fun onLocationChange(
-                session: GeckoSession, 
-                url: String?, 
-                perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>
-            ) {
+            override fun onLocationChange(session: GeckoSession, url: String?, perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>) {
                 if (url != null) {
                     runOnUiThread {
                         if (!urlInput.hasFocus()) {
@@ -68,45 +60,41 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 5. 加载逻辑 (通用版，无弹窗)
         fun loadUrlFromInput() {
             var url = urlInput.text.toString().trim()
             
             if (url.isNotEmpty()) {
-                // 【通用补全逻辑】
-                // 只要不是以标准协议开头，也不是 about: 开头，全部视为网址，强制加 HTTPS
-                if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("about:")) {
-                    url = "https://"
+                // 1. 检查是否已经包含协议
+                val hasProtocol = url.contains("://")
+                
+                // 2. 检查特殊协议
+                val isSpecial = url.startsWith("about:") || 
+                                url.startsWith("javascript:") || 
+                                url.startsWith("file:") ||
+                                url.startsWith("data:")
+
+                // 3. 只有当既没有通用协议，也不是特殊协议时，才默认补全 HTTPS
+                if (!hasProtocol && !isSpecial) {
+                    // 【注意】这里是 Kotlin 的字符串模板，Shell 不会再吃掉它了
+                    url = "https://$url"
                 }
 
-                // 填回输入框，让用户知道我们帮他补全了
                 urlInput.setText(url)
-                
-                // 加载
                 session.loadUri(url)
-                
-                // 收起键盘并聚焦浏览器
                 geckoView.clearFocus()
                 geckoView.requestFocus()
             }
         }
 
-        // 按钮点击
-        goButton.setOnClickListener {
+        goButton.setOnClickListener { loadUrlFromInput() }
+        urlInput.setOnEditorActionListener { _, _, _ -> 
             loadUrlFromInput()
+            true 
         }
 
-        // 键盘回车
-        urlInput.setOnEditorActionListener { _, _, _ ->
-            loadUrlFromInput()
-            true
-        }
-
-        // 导航按钮
         backButton.setOnClickListener { session.goBack() }
         forwardButton.setOnClickListener { session.goForward() }
 
-        // 默认主页
         session.loadUri("https://www.bilibili.com")
     }
 
