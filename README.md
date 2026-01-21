@@ -182,3 +182,99 @@ android.useAndroidX=true
 2.  **GeckoView 版本号** 必须是 Maven 仓库中真实存在的完整时间戳版本，不能编造。
 3.  **文件操作**：在修改 `build.gradle` 时，注意保留 `splits` (分包) 配置，否则 APK 体积会膨胀到 500MB+。
 4.  **环境感知**：当前环境是无头 Linux 服务器，无法打开浏览器下载，请提供 `wget` 或 `curl` 命令。
+
+
+```markdown
+# KeroBrowser (GeckoView Edition)
+
+> 一个基于 Mozilla GeckoView 内核的 Android 浏览器，采用 **"Mobile Coding + Server Building"** 的极客工作流构建。
+
+---
+
+## 🤖 Context for AI Agents (AI 助手必读)
+**如果你是协助开发的 AI，请务必遵守以下规则：**
+
+1.  **构建环境 (Build Environment)**:
+    - 我们**不使用**标准的 `./gradlew` 脚本，因为服务器环境特殊。
+    - **必须使用**手动指定的 Gradle 路径： `./gradle-8.5/bin/gradle`。
+    - **JDK 版本**: Java 17 (Required by GeckoView).
+    - **Android SDK**: API 34 (UpsideDownCake), MinSdk: 24.
+
+2.  **核心配置 (Critical Configs)**:
+    - **GeckoView 版本**: 必须使用 Maven 仓库中真实存在的时间戳版本 (例如 `121.0.20231211174248`)，**严禁**编造版本号。
+    - **APK 分包 (Splits)**: `app/build.gradle` 中配置了 `splits { abi { ... } }` 以生成 Arm64 瘦身包。**修改构建脚本时，绝对不要删除或破坏 splits 代码块**，否则 APK 体积会膨胀至 500MB+。
+    - **AndroidX**: 项目强制开启 AndroidX，`gradle.properties` 中必须包含 `android.useAndroidX=true`。
+
+3.  **UI/UX 规范**:
+    - 布局文件必须保持 ID 稳定：地址栏为 `@+id/address_bar`，按钮为 `@+id/go_button`。
+    - 必须在 `AndroidManifest.xml` 中保留 `android:usesCleartextTraffic="true"` 以兼容 HTTP 站点。
+
+---
+
+## 🛠️ 技术架构 (Technical Architecture)
+
+- **语言**: Kotlin (JVM Target 17)
+- **内核**: Mozilla GeckoView (Channel: Omni)
+- **构建系统**: Gradle 8.5 + Android Gradle Plugin (AGP) 8.2.0
+- **目标架构**:
+  - `arm64-v8a` (主推，体积 ~150MB)
+  - `universal` (备用，体积 ~560MB)
+
+## 📂 项目结构说明 (Project Structure)
+
+```text
+MyBrowser/
+├── .gitignore                # 严格过滤 build/ 和 local.properties
+├── build.gradle              # Root Project Config
+├── gradle.properties         # Enable AndroidX
+├── local.properties          # [不上传] 指向服务器 SDK 路径 (e.g., sdk.dir=/root/android-sdk)
+├── README.md                 # You are here
+└── app/
+    ├── build.gradle          # Module Config (含 GeckoView 版本 & Splits 配置)
+    └── src/
+        └── main/
+            ├── AndroidManifest.xml   # 权限、Activity、CleartextTraffic
+            ├── java/com/kero/browser/
+            │   └── MainActivity.kt   # 核心逻辑 (Session, NavigationDelegate)
+            └── res/layout/
+                └── activity_main.xml # 界面布局 (LinearLayout + GeckoView)
+```
+
+## 🚀 编译与发布指南 (Build & Release)
+
+本项目运行在无头 Linux 服务器上，无 Android Studio 图形界面。
+
+### 1. 准备环境 (First Run)
+确保 `local.properties` 已创建并指向正确的 SDK 路径。
+
+### 2. 编译指令 (Build Command)
+```bash
+# 清理 (可选)
+./gradle-8.5/bin/gradle clean
+
+# 编译 Debug 包 (自动生成双版本)
+./gradle-8.5/bin/gradle assembleDebug
+```
+
+### 3. 发布指令 (Release via GitHub CLI)
+使用 `gh` 命令行工具利用服务器带宽直接上传：
+
+```bash
+gh release create v0.X \
+    app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
+    app/build/outputs/apk/debug/app-universal-debug.apk \
+    --title "v0.X Update" \
+    --notes "更新日志..."
+```
+
+## 📝 常见问题 (Troubleshooting)
+
+- **Q: 编译报错 "overrides nothing"**
+  - **A**: 通常是 `NavigationDelegate` 等接口的函数签名不匹配。检查 GeckoView 对应版本的 API 文档，确认参数是否为 Nullable，或是否增加了新参数 (如 permissions)。
+
+- **Q: 编译报错 "License not accepted"**
+  - **A**: 运行 `yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses`。
+
+- **Q: 按钮点击无反应**
+  - **A**: 检查 `activity_main.xml` 中的 ID 是否与 `MainActivity.kt` 中的 `findViewById` 一致。
+```
