@@ -1,0 +1,14 @@
+# 屏蔽构建产物
+.gradle/
+build/
+app/build/
+
+# 屏蔽本地配置
+local.properties
+
+# 屏蔽 IDE 配置
+.idea/
+*.iml
+.DS_Store
+gradle-8.5/
+*.zip
