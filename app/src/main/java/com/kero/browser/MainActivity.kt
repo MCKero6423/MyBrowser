@@ -13,14 +13,22 @@ import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
 
+// 定义一个简单的类，用来保存每个标签页的信息
+data class Tab(
+    val session: GeckoSession,
+    var title: String = "New Tab",
+    var url: String = ""
+)
+
 class MainActivity : AppCompatActivity() {
 
     companion object {
         private var sRuntime: GeckoRuntime? = null
+        private const val HOME_URL = "https://bing.com"
     }
 
-    // 多窗口管理
-    private val sessions = ArrayList<GeckoSession>()
+    // 这里改成存储 Tab 对象，而不是原始的 Session
+    private val tabs = ArrayList<Tab>()
     private var currentTabIndex = -1
 
     private lateinit var geckoView: GeckoView
@@ -32,7 +40,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. 初始化控件
         geckoView = findViewById(R.id.geckoview)
         urlInput = findViewById(R.id.address_bar)
         progressBar = findViewById(R.id.progress_bar)
@@ -41,81 +48,76 @@ class MainActivity : AppCompatActivity() {
         val backButton = findViewById<Button>(R.id.btn_back)
         val forwardButton = findViewById<Button>(R.id.btn_forward)
 
-        // 2. 初始化 Runtime
         if (sRuntime == null) {
             sRuntime = GeckoRuntime.create(this)
         }
 
-        // 3. 创建第一个标签页
-        createNewTab("https://www.bilibili.com")
+        createNewTab(HOME_URL)
 
-        // 4. 事件绑定
         goButton.setOnClickListener { loadUrlFromInput() }
         urlInput.setOnEditorActionListener { _, _, _ -> 
             loadUrlFromInput()
             true 
         }
 
+        // 修复：直接调用 goBack/goForward，不检查 canGoBack (API 不支持)
         backButton.setOnClickListener { getCurrentSession()?.goBack() }
         forwardButton.setOnClickListener { getCurrentSession()?.goForward() }
 
-        // 【核心】多窗口按钮点击事件
         tabsButton.setOnClickListener { showTabSwitcher() }
     }
 
-    // --- 核心逻辑区 ---
-
-    private fun getCurrentSession(): GeckoSession? {
-        if (currentTabIndex >= 0 && currentTabIndex < sessions.size) {
-            return sessions[currentTabIndex]
+    private fun getCurrentTab(): Tab? {
+        if (currentTabIndex >= 0 && currentTabIndex < tabs.size) {
+            return tabs[currentTabIndex]
         }
         return null
     }
 
-    // 创建新标签页
+    private fun getCurrentSession(): GeckoSession? {
+        return getCurrentTab()?.session
+    }
+
     private fun createNewTab(url: String) {
         val session = GeckoSession()
         session.open(sRuntime!!)
         
-        // 绑定监听器 (每个 Session 都要绑定)
-        initSessionListeners(session)
+        val newTab = Tab(session)
         
-        sessions.add(session)
-        switchToTab(sessions.size - 1) // 切换到新创建的 tab
+        // 绑定监听器
+        initSessionListeners(newTab)
+        
+        tabs.add(newTab)
+        switchToTab(tabs.size - 1)
         
         session.loadUri(url)
         updateTabsButton()
     }
 
-    // 切换标签页
     private fun switchToTab(index: Int) {
-        if (index < 0 || index >= sessions.size) return
+        if (index < 0 || index >= tabs.size) return
         
         currentTabIndex = index
-        val session = sessions[index]
+        val tab = tabs[index]
         
-        // 把 View 指向新的 Session
         geckoView.releaseSession()
-        geckoView.setSession(session)
+        geckoView.setSession(tab.session)
         
-        // 更新 UI 状态
-        urlInput.setText(session.currentUri ?: "")
+        // 修复：从我们自己记录的 tab.url 获取网址
+        urlInput.setText(tab.url)
         updateTabsButton()
     }
 
-    // 关闭标签页
     private fun closeTab(index: Int) {
-        if (index < 0 || index >= sessions.size) return
+        if (index < 0 || index >= tabs.size) return
         
-        val session = sessions[index]
-        session.close()
-        sessions.removeAt(index)
+        val tab = tabs[index]
+        tab.session.close()
+        tabs.removeAt(index)
         
-        if (sessions.isEmpty()) {
-            // 如果关完了，自动新建一个空白页
-            createNewTab("about:blank")
+        if (tabs.isEmpty()) {
+            createNewTab(HOME_URL)
         } else {
-            // 如果关的是当前的，或者是前面的，需要修正 index
             if (index <= currentTabIndex) {
                 currentTabIndex = maxOf(0, currentTabIndex - 1)
             }
@@ -124,11 +126,12 @@ class MainActivity : AppCompatActivity() {
         updateTabsButton()
     }
 
-    // 初始化 Session 的监听器
-    private fun initSessionListeners(session: GeckoSession) {
+    // 这里传入的是 Tab 对象，方便我们更新 Tab 里的数据
+    private fun initSessionListeners(tab: Tab) {
+        val session = tab.session
+        
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onProgressChange(session: GeckoSession, progress: Int) {
-                // 只有当前显示的 Session 才有资格更新进度条
                 if (session == getCurrentSession()) {
                     runOnUiThread {
                         progressBar.progress = progress
@@ -140,7 +143,11 @@ class MainActivity : AppCompatActivity() {
 
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onLocationChange(session: GeckoSession, url: String?, perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>) {
-                // 只有当前显示的 Session 才有资格更新地址栏
+                // 修复：把网址记在 Tab 对象里
+                if (url != null) {
+                    tab.url = url
+                }
+                
                 if (session == getCurrentSession() && url != null) {
                     runOnUiThread {
                         if (!urlInput.hasFocus()) {
@@ -149,24 +156,25 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+            
+            // 可选：监听标题变化（如果有需要）
         }
     }
 
-    // 弹出窗口切换列表
     private fun showTabSwitcher() {
-        // 获取所有标题 (如果没有标题就显示 URL，还没有就显示 Tab #N)
-        val titles = sessions.mapIndexed { index, session -> 
-            val title = if (session.currentUri?.isNotEmpty() == true) session.currentUri else "New Tab"
-            "${index + 1}. $title"
+        // 修复：使用 tab.url 或 tab.title 作为列表标题
+        val titles = tabs.mapIndexed { index, tab -> 
+            val displayTitle = if (tab.url.isNotEmpty()) tab.url else "New Tab"
+            "${index + 1}. $displayTitle"
         }.toTypedArray()
 
         AlertDialog.Builder(this)
-            .setTitle("切换窗口 (${sessions.size})")
+            .setTitle("切换窗口 (${tabs.size})")
             .setItems(titles) { _, which ->
                 switchToTab(which)
             }
             .setPositiveButton("新建窗口") { _, _ ->
-                createNewTab("https://www.baidu.com")
+                createNewTab(HOME_URL)
             }
             .setNegativeButton("关闭当前") { _, _ ->
                 closeTab(currentTabIndex)
@@ -176,7 +184,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTabsButton() {
-        tabsButton.text = "${sessions.size}"
+        tabsButton.text = "${tabs.size}"
     }
 
     private fun loadUrlFromInput() {
@@ -199,16 +207,14 @@ class MainActivity : AppCompatActivity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         val session = getCurrentSession()
-        if (session != null && session.canGoBack()) { // 需要 GeckoView 121+ API 支持 canGoBack 检查，这里先盲调
-            session.goBack()
+        if (session != null) {
+             // 修复：直接调用 goBack，不检查 canGoBack
+             session.goBack()
         } else {
-             // 如果不能后退了，且有多个标签，提示一下是否退出？
-             // 这里简化：直接后台运行
-             moveTaskToBack(true)
+             super.onBackPressed()
         }
     }
     
-    // 简单的 maxOf 辅助函数 (防止低版本 Kotlin 报错)
     private fun maxOf(a: Int, b: Int): Int {
         return if (a > b) a else b
     }
