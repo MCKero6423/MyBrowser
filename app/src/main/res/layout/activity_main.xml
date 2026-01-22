@@ -3,9 +3,28 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:background="#FFFFFF">
 
-    <!-- 顶部操作栏 -->
+    <!-- 1. 网页显示区域 (占满上方剩余空间) -->
+    <org.mozilla.geckoview.GeckoView
+        android:id="@+id/geckoview"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- 2. 进度条 (卡在网页和底部栏中间) -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
+        android:progressDrawable="@android:drawable/progress_horizontal"
+        android:visibility="invisible"
+        android:layout_marginBottom="0dp" />
+
+    <!-- 3. 底部操作栏 -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="50dp"
@@ -17,38 +36,33 @@
         <!-- 后退 -->
         <Button
             android:id="@+id/btn_back"
-            android:layout_width="35dp"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
             android:text="&lt;"
-            android:textSize="18sp"
-            android:padding="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"/>
+            android:textSize="20sp"
+            android:background="@android:color/transparent"
+            android:textColor="#333333"/>
 
         <!-- 前进 -->
         <Button
             android:id="@+id/btn_forward"
-            android:layout_width="35dp"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
             android:text="&gt;"
-            android:textSize="18sp"
-            android:padding="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:layout_marginStart="2dp"/>
+            android:textSize="20sp"
+            android:background="@android:color/transparent"
+            android:textColor="#333333"/>
 
-        <!-- 刷新/停止 (新) -->
+        <!-- 刷新/停止 -->
         <Button
             android:id="@+id/btn_refresh"
-            android:layout_width="35dp"
+            android:layout_width="40dp"
             android:layout_height="match_parent"
             android:text="↻"
-            android:textSize="18sp"
+            android:textSize="20sp"
             android:textStyle="bold"
-            android:padding="0dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"
-            android:layout_marginStart="2dp"/>
+            android:background="@android:color/transparent"
+            android:textColor="#333333"/>
 
         <!-- 地址栏 -->
         <EditText
@@ -65,39 +79,24 @@
             android:textSize="14sp"
             android:layout_marginStart="4dp"/>
 
-        <!-- 多窗口按钮 -->
+        <!-- 多窗口 -->
         <Button
             android:id="@+id/btn_tabs"
             android:layout_width="40dp"
             android:layout_height="match_parent"
             android:text="1"
             android:textStyle="bold"
-            android:layout_marginStart="4dp"
-            android:insetTop="0dp"
-            android:insetBottom="0dp"/>
+            android:background="@android:color/transparent"
+            android:textColor="#333333"/>
 
-        <!-- 访问按钮 -->
+        <!-- Go -->
         <Button
             android:id="@+id/go_button"
-            android:layout_width="wrap_content"
+            android:layout_width="45dp"
             android:layout_height="match_parent"
             android:text="Go"
-            android:layout_marginStart="2dp"/>
+            android:background="@android:color/transparent"
+            android:textColor="#007AFF"/>
     </LinearLayout>
-
-    <ProgressBar
-        android:id="@+id/progress_bar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:max="100"
-        android:progressDrawable="@android:drawable/progress_horizontal"
-        android:visibility="invisible"/>
-
-    <org.mozilla.geckoview.GeckoView
-        android:id="@+id/geckoview"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
 
 </LinearLayout>

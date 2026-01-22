@@ -11,22 +11,17 @@ android {
         applicationId "com.kero.browser"
         minSdk 24
         targetSdk 34
-        versionCode 82       // 升个级
-        versionName "0.8.2"  // v0.8.2 私钥版
-        
+        versionCode 91
+        versionName "0.9.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
         release {
-            // 1. 指定你的密钥文件
             storeFile file("key.jks")
-            
-            // 2. 指定你的别名
+            // 确保这里是你查出来的正确别名
             keyAlias "qiu shengming key"
-            
-            // 3. 密码不写死，而是从命令行参数读取 (-PMyPass=...)
-            // 如果没传密码，就给个空字符串占位（会编译失败提示）
+            // 密码等待命令行输入
             storePassword project.findProperty("MyPass") ?: ""
             keyPassword project.findProperty("MyPass") ?: ""
         }
@@ -35,15 +30,20 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
+            // 彻底关闭混淆，防止内存溢出
             minifyEnabled false
             shrinkResources false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-        debug {
-            applicationIdSuffix ".debug"
         }
     }
     
+    // 防止 Strip 步骤消耗内存
+    packagingOptions {
+        doNotStrip "*/arm64-v8a/*.so"
+        doNotStrip "*/armeabi-v7a/*.so"
+        doNotStrip "*/x86/*.so"
+        doNotStrip "*/x86_64/*.so"
+    }
+
     splits {
         abi {
             enable true

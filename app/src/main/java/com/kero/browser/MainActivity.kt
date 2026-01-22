@@ -17,7 +17,7 @@ data class Tab(
     val session: GeckoSession,
     var title: String = "New Tab",
     var url: String = "",
-    var isLoading: Boolean = false // 新增：记录该页面是否正在加载
+    var isLoading: Boolean = false
 )
 
 class MainActivity : AppCompatActivity() {
@@ -37,19 +37,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var urlInput: EditText
     private lateinit var progressBar: ProgressBar
     private lateinit var tabsButton: Button
-    private lateinit var refreshButton: Button // 新按钮
+    private lateinit var refreshButton: Button
     private lateinit var prefs: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. 初始化控件
         geckoView = findViewById(R.id.geckoview)
         urlInput = findViewById(R.id.address_bar)
         progressBar = findViewById(R.id.progress_bar)
         tabsButton = findViewById(R.id.btn_tabs)
-        refreshButton = findViewById(R.id.btn_refresh) // 获取实例
+        refreshButton = findViewById(R.id.btn_refresh)
         val goButton = findViewById<Button>(R.id.go_button)
         val backButton = findViewById<Button>(R.id.btn_back)
         val forwardButton = findViewById<Button>(R.id.btn_forward)
@@ -64,7 +63,6 @@ class MainActivity : AppCompatActivity() {
             createNewTab(HOME_URL)
         }
 
-        // 2. 事件绑定
         goButton.setOnClickListener { loadUrlFromInput() }
         urlInput.setOnEditorActionListener { _, _, _ -> 
             loadUrlFromInput()
@@ -75,15 +73,13 @@ class MainActivity : AppCompatActivity() {
         forwardButton.setOnClickListener { getCurrentSession()?.goForward() }
         tabsButton.setOnClickListener { showTabSwitcher() }
         
-        // 3. 刷新/停止按钮逻辑
         refreshButton.setOnClickListener {
             val tab = getCurrentTab() ?: return@setOnClickListener
             if (tab.isLoading) {
-                tab.session.stop() // 正在加载 -> 停止
-                // 视觉上立即变回刷新，虽然 progressDelegate 也会回调，但这样响应更快
+                tab.session.stop()
                 refreshButton.text = "↻"
             } else {
-                tab.session.reload() // 没在加载 -> 刷新
+                tab.session.reload()
                 refreshButton.text = "✕"
             }
         }
@@ -159,13 +155,10 @@ class MainActivity : AppCompatActivity() {
         geckoView.setSession(tab.session)
         
         urlInput.setText(tab.url)
-        
-        // 切换标签时，更新刷新按钮的状态
         updateRefreshButtonState(tab.isLoading)
         updateTabsButton()
     }
 
-    // 封装更新按钮图标的逻辑
     private fun updateRefreshButtonState(isLoading: Boolean) {
         refreshButton.text = if (isLoading) "✕" else "↻"
     }
@@ -194,14 +187,11 @@ class MainActivity : AppCompatActivity() {
         
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onProgressChange(session: GeckoSession, progress: Int) {
-                // 更新 Tab 状态
                 tab.isLoading = (progress < 100)
-
                 if (session == getCurrentSession()) {
                     runOnUiThread {
                         progressBar.progress = progress
                         progressBar.visibility = if (progress < 100) View.VISIBLE else View.INVISIBLE
-                        // 实时更新按钮状态
                         updateRefreshButtonState(tab.isLoading)
                     }
                 }
