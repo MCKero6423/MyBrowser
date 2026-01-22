@@ -1,280 +1,213 @@
-# KeroBrowser 开发文档
+# KeroBrowser 🦊
 
-> **项目代号**: MyBrowser / KeroBrowser
-> **核心引擎**: Mozilla GeckoView (Firefox Engine)
-> **架构**: Android Native (Kotlin) + Remote Build Server
+<p align="center">
+  <b>基于 Mozilla GeckoView 内核的 Android 浏览器</b><br>
+  <i>独立内核 · 多标签页 · 会话持久化 · 底部导航</i>
+</p>
 
-## 1. 项目概述 (Project Overview)
-
-这是一个基于 **Mozilla GeckoView** 内核的 Android 浏览器项目。
-与基于 System WebView 的浏览器不同，本项目内嵌了完整的 Gecko 渲染引擎，意味着：
-*   **独立性**：不受 Android 系统 WebView 版本限制，内核独立更新。
-*   **扩展性**：原生支持 WebExtensions (如 uBlock Origin)。
-*   **隐私性**：完全可控的追踪保护和数据隔离。
-
-本项目采用 **“手机开发 + 服务器编译”** 的特殊工作流，旨在利用服务器的高性能和高带宽进行构建和发布。
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-0.9.1-blue" alt="Version">
+  <img src="https://img.shields.io/badge/Engine-GeckoView%20121.0-orange" alt="Engine">
+  <img src="https://img.shields.io/badge/Min%20SDK-24%20(Android%207.0)-green" alt="Min SDK">
+  <img src="https://img.shields.io/badge/License-MPL%202.0-purple" alt="License">
+</p>
 
 ---
 
-## 2. 技术栈 (Tech Stack)
+## ✨ 功能特性
 
-*   **编程语言**: Kotlin (JVM Target 17)
-*   **构建工具**: Gradle 8.5 (配合 AGP 8.2.0)
-*   **核心依赖**:
-    *   `org.mozilla.geckoview:geckoview-omni:{version}` (稳定版通道)
-    *   AndroidX / Material Design Components
-*   **目标设备**:
-    *   **Min SDK**: 24 (Android 7.0)
-    *   **Target SDK**: 34 (Android 14)
-    *   **主要架构**: `arm64-v8a` (针对现代 Android 手机优化)
+| 功能 | 描述 |
+|------|------|
+| 🔥 **GeckoView 内核** | Firefox 同款 Gecko 引擎，独立于系统 WebView，支持现代 Web 标准 |
+| 🗂️ **多标签页** | 新建/切换/关闭标签，底部数字按钮显示当前窗口数 |
+| 💾 **会话持久化** | 退出自动保存所有标签页 URL，重启无缝恢复 |
+| ↻/✕ **智能刷新** | 加载中显示 ✕ (停止)，加载完成显示 ↻ (刷新) |
+| 🔗 **URL 智能补全** | 自动识别并补全 `https://`，兼容 `file://`、`about:` 等协议 |
+| 📱 **底部操作栏** | 地址栏和按钮置于底部，单手操作友好，键盘弹出自动适配 |
 
 ---
 
-## 3. 项目结构 (Directory Structure)
+## 📥 下载安装
 
-```text
+前往 [**Releases**](https://github.com/MCKero6423/MyBrowser/releases) 下载：
+
+| 文件名 | 说明 | 体积 |
+|--------|------|------|
+| `app-arm64-v8a-release.apk` | **推荐** - 适用于绝大多数现代手机 | ~150 MB |
+| `app-universal-release.apk` | 备用 - 兼容所有架构 | ~560 MB |
+
+> ⚠️ **升级提示**: 从 v0.8.1 或更早版本升级，由于签名变更，需**先卸载旧版本**再安装。
+
+---
+
+## 📱 界面布局
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│           [ GeckoView 网页区域 ]     │
+│                                     │
+├─────────────────────────────────────┤
+│ ▓▓▓▓▓▓▓▓░░░░░░░░░░░░  进度条        │
+├─────────────────────────────────────┤
+│ [<] [>] [↻] [   地址栏   ] [1] [Go] │
+└─────────────────────────────────────┘
+```
+
+**按钮功能**: `<` 后退 | `>` 前进 | `↻/✕` 刷新/停止 | `数字` 标签页管理 | `Go` 跳转
+
+---
+
+## 🛠️ 技术规格
+
+| 项目 | 值 |
+|------|-----|
+| **包名** | `com.kero.browser` |
+| **语言** | Kotlin |
+| **内核** | GeckoView `121.0.20231211174248` (Omni) |
+| **构建** | Gradle 8.5 + AGP 8.2.0 |
+| **SDK** | Min 24 / Target 34 |
+| **签名** | 私钥签名 (`key.jks`) |
+
+---
+
+## 📂 项目结构
+
+```
 MyBrowser/
-├── .gitignore                # Git 忽略配置 (非常重要，防止上传构建产物)
-├── build.gradle              # 项目级构建脚本
-├── settings.gradle           # 模块引用设置
-├── gradle.properties         # 全局配置 (开启 AndroidX)
-├── local.properties          # SDK 路径配置 (不上传 Git，需本地生成)
-└── app/                      # 主模块
-    ├── build.gradle          # 模块级构建脚本 (含 GeckoView 版本和分包配置)
-    └── src/
-        └── main/
-            ├── AndroidManifest.xml   # 权限与 Activity 声明
-            ├── java/com/kero/browser/
-            │   └── MainActivity.kt   # 核心逻辑 (加载内核)
-            └── res/layout/
-                └── activity_main.xml # 界面布局
+├── app/
+│   ├── build.gradle                    # 模块配置 (签名、分包、依赖)
+│   ├── key.jks                         # 签名密钥 (不上传 Git)
+│   └── src/main/
+│       ├── AndroidManifest.xml         # 权限、adjustResize
+│       ├── java/.../MainActivity.kt    # 核心逻辑
+│       └── res/
+│           ├── layout/activity_main.xml
+│           └── values/strings.xml
+├── build.gradle                        # 根项目配置
+├── gradle.properties                   # android.useAndroidX=true
+├── settings.gradle
+└── README.md
 ```
 
 ---
 
-## 4. 构建环境搭建 (Build Environment Setup)
+## 🔧 服务器编译指南
 
-本项目推荐在 **Linux 服务器 (Debian/Ubuntu)** 上进行无头(Headless)编译。
+本项目采用 **"手机开发 + 服务器编译"** 工作流。
 
-### 4.1 基础依赖
-确保服务器安装了 JDK 17 和基础工具：
-```bash
-sudo apt update
-sudo apt install openjdk-17-jdk unzip wget git curl -y
-```
+### 环境要求
+- **OS**: Debian/Ubuntu Server
+- **JDK**: OpenJDK 17
+- **RAM**: 2GB+ (需开启 Swap 避免 OOM)
+- **Gradle**: 8.5 (手动安装，非 gradlew)
 
-### 4.2 Android SDK (命令行版)
-1.  下载 Google `commandlinetools-linux`。
-2.  解压并重命名目录结构为 `cmdline-tools/latest`。
-3.  配置环境变量：
-    ```bash
-    export ANDROID_HOME=$HOME/android-sdk
-    export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-    ```
-4.  安装构建组件：
-    ```bash
-    yes | sdkmanager --licenses
-    sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-    ```
-
-### 4.3 Gradle (手动安装)
-由于 AGP 8.2.0 需要 Gradle 8.2+，系统自带的通常太老。
-1.  下载 **Gradle 8.5** 二进制包 (`gradle-8.5-bin.zip`)。
-2.  解压并添加到 PATH。
-
-### 4.4 本地配置 (关键)
-在项目根目录创建 `local.properties` 文件，指向 SDK 路径：
-```properties
-sdk.dir=/root/android-sdk
-# 或者 /home/username/android-sdk
-```
-
----
-
-## 5. 编译与发布流程 (Build & Release Workflow)
-
-### 5.1 编译命令
-在项目根目录下执行：
-```bash
-# 赋予执行权限 (如果需要)
-chmod +x ./gradle-8.5/bin/gradle
-
-# 编译 Debug 包
-gradle assembleDebug
-```
-
-### 5.2 产物输出 (Artifacts)
-由于配置了 `splits`，编译会生成两个 APK 文件：
-1.  **瘦身版 (推荐)**: `app/build/outputs/apk/debug/app-arm64-v8a-debug.apk` (~150MB)
-2.  **全兼容版**: `app/build/outputs/apk/debug/app-universal-debug.apk` (~560MB)
-
-### 5.3 发布到 GitHub Releases
-使用 GitHub CLI (`gh`) 直接从服务器发布，利用服务器带宽。
+### 编译命令
 
 ```bash
-# 登录 (仅需一次)
-gh auth login
+# 1. 确保 Swap 已开启 (防止内存溢出)
+free -h  # 检查 Swap 状态
 
-# 创建 Release 并上传双版本
-gh release create v0.1 \
-    app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
-    app/build/outputs/apk/debug/app-universal-debug.apk \
-    --title "v0.1 Alpha" \
-    --notes "GeckoView 121.0 内核构建"
-```
-
----
-
-## 6. 开发工作流 (Development Lifecycle)
-
-这是一个 **端到端** 的闭环开发流程：
-
-1.  **手机端 (Coding)**:
-    *   在手机上使用编辑器修改 Kotlin 代码。
-    *   `git add .` -> `git commit` -> `git push` 推送到 GitHub 仓库。
-
-2.  **服务器端 (Building)**:
-    *   `git pull` 拉取最新代码。
-    *   执行 `gradle assembleDebug` 进行编译。
-    *   执行 `gh release create` 发布新版本。
-
-3.  **手机端 (Testing)**:
-    *   访问 GitHub Releases 页面。
-    *   下载 `arm64` 版本 APK 进行覆盖安装测试。
-
----
-
-## 7. 常见问题与维护 (FAQ)
-
-### Q1: 如何更新内核版本？
-修改 `app/build.gradle` 中的 `ext` 块：
-```groovy
-ext {
-    // 访问 maven.mozilla.org 查询最新的 Omni 版本号
-    geckoviewVersion = "121.0.20231211174248" 
-}
-```
-修改后重新编译，Gradle 会自动下载新内核。
-
-### Q2: 编译报错 `License not accepted`
-运行以下命令并一路输入 `y`：
-```bash
-yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-```
-
-### Q3: 为什么 GitHub Push 失败？
-检查是否尝试直接 Push 了 APK 文件。
-**严禁**将 `build/` 目录或 `.apk` 文件添加到 git 版本控制中。请检查 `.gitignore` 文件是否包含 `build/`。
-APK 必须通过 Releases 功能发布。
-
-### Q4: 如何开启 AndroidX 支持？
-如果报错 `AndroidX dependencies`，检查根目录 `gradle.properties` 是否包含：
-```properties
-android.useAndroidX=true
-```
-
----
-
-## 8. 给 AI 助手的提示 (Prompt for AI)
-
-如果你是帮助维护此项目的 AI，请注意：
-1.  **不要尝试生成 gradlew 脚本**，我们使用手动下载的 Gradle 8.5。
-2.  **GeckoView 版本号** 必须是 Maven 仓库中真实存在的完整时间戳版本，不能编造。
-3.  **文件操作**：在修改 `build.gradle` 时，注意保留 `splits` (分包) 配置，否则 APK 体积会膨胀到 500MB+。
-4.  **环境感知**：当前环境是无头 Linux 服务器，无法打开浏览器下载，请提供 `wget` 或 `curl` 命令。
-
-
-```markdown
-# KeroBrowser (GeckoView Edition)
-
-> 一个基于 Mozilla GeckoView 内核的 Android 浏览器，采用 **"Mobile Coding + Server Building"** 的极客工作流构建。
-
----
-
-## 🤖 Context for AI Agents (AI 助手必读)
-**如果你是协助开发的 AI，请务必遵守以下规则：**
-
-1.  **构建环境 (Build Environment)**:
-    - 我们**不使用**标准的 `./gradlew` 脚本，因为服务器环境特殊。
-    - **必须使用**手动指定的 Gradle 路径： `./gradle-8.5/bin/gradle`。
-    - **JDK 版本**: Java 17 (Required by GeckoView).
-    - **Android SDK**: API 34 (UpsideDownCake), MinSdk: 24.
-
-2.  **核心配置 (Critical Configs)**:
-    - **GeckoView 版本**: 必须使用 Maven 仓库中真实存在的时间戳版本 (例如 `121.0.20231211174248`)，**严禁**编造版本号。
-    - **APK 分包 (Splits)**: `app/build.gradle` 中配置了 `splits { abi { ... } }` 以生成 Arm64 瘦身包。**修改构建脚本时，绝对不要删除或破坏 splits 代码块**，否则 APK 体积会膨胀至 500MB+。
-    - **AndroidX**: 项目强制开启 AndroidX，`gradle.properties` 中必须包含 `android.useAndroidX=true`。
-
-3.  **UI/UX 规范**:
-    - 布局文件必须保持 ID 稳定：地址栏为 `@+id/address_bar`，按钮为 `@+id/go_button`。
-    - 必须在 `AndroidManifest.xml` 中保留 `android:usesCleartextTraffic="true"` 以兼容 HTTP 站点。
-
----
-
-## 🛠️ 技术架构 (Technical Architecture)
-
-- **语言**: Kotlin (JVM Target 17)
-- **内核**: Mozilla GeckoView (Channel: Omni)
-- **构建系统**: Gradle 8.5 + Android Gradle Plugin (AGP) 8.2.0
-- **目标架构**:
-  - `arm64-v8a` (主推，体积 ~150MB)
-  - `universal` (备用，体积 ~560MB)
-
-## 📂 项目结构说明 (Project Structure)
-
-```text
-MyBrowser/
-├── .gitignore                # 严格过滤 build/ 和 local.properties
-├── build.gradle              # Root Project Config
-├── gradle.properties         # Enable AndroidX
-├── local.properties          # [不上传] 指向服务器 SDK 路径 (e.g., sdk.dir=/root/android-sdk)
-├── README.md                 # You are here
-└── app/
-    ├── build.gradle          # Module Config (含 GeckoView 版本 & Splits 配置)
-    └── src/
-        └── main/
-            ├── AndroidManifest.xml   # 权限、Activity、CleartextTraffic
-            ├── java/com/kero/browser/
-            │   └── MainActivity.kt   # 核心逻辑 (Session, NavigationDelegate)
-            └── res/layout/
-                └── activity_main.xml # 界面布局 (LinearLayout + GeckoView)
-```
-
-## 🚀 编译与发布指南 (Build & Release)
-
-本项目运行在无头 Linux 服务器上，无 Android Studio 图形界面。
-
-### 1. 准备环境 (First Run)
-确保 `local.properties` 已创建并指向正确的 SDK 路径。
-
-### 2. 编译指令 (Build Command)
-```bash
-# 清理 (可选)
+# 2. 清理旧构建
 ./gradle-8.5/bin/gradle clean
 
-# 编译 Debug 包 (自动生成双版本)
+# 3. 编译 Release 版 (密码通过参数传入)
+./gradle-8.5/bin/gradle assembleRelease -PMyPass=你的密钥密码
+
+# 4. 编译 Debug 版 (无需密码)
 ./gradle-8.5/bin/gradle assembleDebug
 ```
 
-### 3. 发布指令 (Release via GitHub CLI)
-使用 `gh` 命令行工具利用服务器带宽直接上传：
+### 产物位置
+
+```
+app/build/outputs/apk/
+├── release/
+│   ├── app-arm64-v8a-release.apk    # 推荐
+│   └── app-universal-release.apk
+└── debug/
+    ├── app-arm64-v8a-debug.apk
+    └── app-universal-debug.apk
+```
+
+### 发布到 GitHub
 
 ```bash
-gh release create v0.X \
-    app/build/outputs/apk/debug/app-arm64-v8a-debug.apk \
-    app/build/outputs/apk/debug/app-universal-debug.apk \
-    --title "v0.X Update" \
-    --notes "更新日志..."
+gh release create v0.X.X \
+    app/build/outputs/apk/release/app-arm64-v8a-release.apk \
+    app/build/outputs/apk/release/app-universal-release.apk \
+    --title "v0.X.X - 更新说明" \
+    --notes "更新内容..."
 ```
 
-## 📝 常见问题 (Troubleshooting)
+---
 
-- **Q: 编译报错 "overrides nothing"**
-  - **A**: 通常是 `NavigationDelegate` 等接口的函数签名不匹配。检查 GeckoView 对应版本的 API 文档，确认参数是否为 Nullable，或是否增加了新参数 (如 permissions)。
+## 🤖 AI 助手规则 (Prompt for AI)
 
-- **Q: 编译报错 "License not accepted"**
-  - **A**: 运行 `yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses`。
+如果你是协助开发的 AI，**必须遵守以下规则**：
 
-- **Q: 按钮点击无反应**
-  - **A**: 检查 `activity_main.xml` 中的 ID 是否与 `MainActivity.kt` 中的 `findViewById` 一致。
-```
+### 构建环境
+- ❌ **不使用** `./gradlew`
+- ✅ **使用** `./gradle-8.5/bin/gradle`
+- JDK: **Java 17**
+- SDK: **API 34**，MinSdk: **24**
+
+### 关键配置 ⚠️
+1. **GeckoView 版本**: 必须使用 Maven 真实存在的时间戳版本 (当前: `121.0.20231211174248`)，**严禁编造**
+2. **APK 分包 (`splits`)**: 绝对不要删除，否则体积膨胀到 500MB+
+3. **`packagingOptions.doNotStrip`**: 防止 Strip 导致内存溢出
+4. **`minifyEnabled false`**: 关闭混淆保证 GeckoView 稳定
+5. **签名**: 密码通过 `-PMyPass=xxx` 传入，别名为 `qiu shengming key`
+
+### UI/代码规范
+| ID | 用途 |
+|----|------|
+| `@+id/geckoview` | 网页视图 |
+| `@+id/address_bar` | 地址栏 |
+| `@+id/go_button` | 跳转按钮 |
+| `@+id/btn_tabs` | 标签页按钮 |
+| `@+id/btn_refresh` | 刷新/停止按钮 |
+| `@+id/btn_back` / `btn_forward` | 前进后退 |
+| `@+id/progress_bar` | 进度条 |
+
+### 持久化
+- `SharedPreferences` 名称: `KeroBrowserPrefs`
+- Key: `tab_urls` (用 `|` 分隔的 URL 列表)
+- Key: `current_tab_index` (当前标签索引)
+
+---
+
+## 📜 更新日志
+
+### v0.9.1 (2026-01-22) - UI Revolution
+- 地址栏移至底部，单手操作更舒适
+- 修复键盘遮挡问题 (`adjustResize`)
+- 使用私钥签名
+
+### v0.8.2 - 私钥签名正式版
+- 首次使用私钥签名
+- 包含多窗口、刷新按钮、自动保存等所有功能
+
+### v0.8.1 - 刷新增强版
+- 新增 ↻/✕ 智能刷新按钮
+
+### v0.8 - 永不失忆版
+- 标签页持久化 (自动保存/恢复)
+
+### v0.7 - 多窗口版
+- 多标签页支持
+
+### v0.5 - 导航增强版
+- 后退/前进按钮、进度条、系统返回键适配
+
+---
+
+## 📄 许可证
+
+[Mozilla Public License 2.0 (MPL 2.0)](LICENSE)
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/MCKero6423">@MCKero6423</a>
+</p>
