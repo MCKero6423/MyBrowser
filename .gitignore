@@ -12,3 +12,7 @@ local.properties
 .DS_Store
 gradle-8.5/
 *.zip
+*.jks
+*.keystore
+local.properties
+*.hprof
