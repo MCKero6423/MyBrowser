@@ -18,96 +18,102 @@
         android:id="@+id/progress_bar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
+        android:layout_height="2dp"
         android:max="100"
         android:progressDrawable="@android:drawable/progress_horizontal"
         android:visibility="invisible"
         android:layout_marginBottom="0dp" />
 
-    <!-- 3. 底部操作栏 -->
+    <!-- 3. 底部操作栏 (白色背景 + 阴影) -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="50dp"
+        android:layout_height="56dp"
         android:orientation="horizontal"
-        android:background="#F0F0F0"
-        android:padding="4dp"
+        android:background="#FFFFFF"
+        android:elevation="12dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
         android:gravity="center_vertical">
 
-        <!-- 后退 -->
-        <Button
+        <!-- 后退 (图标) -->
+        <ImageButton
             android:id="@+id/btn_back"
-            android:layout_width="35dp"
-            android:layout_height="match_parent"
-            android:text="&lt;"
-            android:textSize="18sp"
-            android:background="@android:color/transparent"
-            android:textColor="#333333"/>
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_back"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:contentDescription="Back"/>
 
-        <!-- 前进 -->
-        <Button
+        <!-- 前进 (图标) -->
+        <ImageButton
             android:id="@+id/btn_forward"
-            android:layout_width="35dp"
-            android:layout_height="match_parent"
-            android:text="&gt;"
-            android:textSize="18sp"
-            android:background="@android:color/transparent"
-            android:textColor="#333333"/>
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_forward"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:contentDescription="Forward"/>
 
-        <!-- 刷新/停止 -->
-        <Button
+        <!-- 刷新 (图标) -->
+        <ImageButton
             android:id="@+id/btn_refresh"
-            android:layout_width="35dp"
-            android:layout_height="match_parent"
-            android:text="↻"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:background="@android:color/transparent"
-            android:textColor="#333333"/>
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_refresh"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:contentDescription="Refresh"/>
 
-        <!-- 地址栏 -->
+        <!-- 地址栏 (圆角) -->
         <EditText
             android:id="@+id/address_bar"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="40dp"
             android:layout_weight="1"
+            android:background="@drawable/bg_address_bar"
             android:hint="Search"
             android:inputType="textUri"
             android:imeOptions="actionGo"
-            android:background="@android:color/white"
-            android:paddingStart="8dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="12dp"
             android:maxLines="1"
             android:textSize="14sp"
-            android:layout_marginStart="4dp"/>
+            android:textColor="#202124"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"/>
 
-        <!-- 多窗口 -->
+        <!-- 多窗口 (数字按钮保持文字，但加粗) -->
         <Button
             android:id="@+id/btn_tabs"
-            android:layout_width="35dp"
-            android:layout_height="match_parent"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:text="1"
+            android:textSize="13sp"
             android:textStyle="bold"
-            android:background="@android:color/transparent"
-            android:textColor="#333333"/>
+            android:textColor="#5F6368"
+            android:background="@drawable/bg_address_bar"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:padding="0dp"
+            android:layout_marginEnd="4dp"/>
             
-        <!-- 菜单 (新) -->
-        <Button
+        <!-- 菜单 (图标) -->
+        <ImageButton
             android:id="@+id/btn_menu"
-            android:layout_width="35dp"
-            android:layout_height="match_parent"
-            android:text="⋮"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:background="@android:color/transparent"
-            android:textColor="#333333"/>
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_menu"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:scaleType="centerInside"
+            android:contentDescription="Menu"/>
 
-        <!-- Go -->
+        <!-- Go 按钮隐藏，输入法回车即可，节省空间 -->
         <Button
             android:id="@+id/go_button"
-            android:layout_width="40dp"
-            android:layout_height="match_parent"
-            android:text="Go"
-            android:background="@android:color/transparent"
-            android:textColor="#007AFF"/>
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:visibility="gone"/>
     </LinearLayout>
 
 </LinearLayout>
