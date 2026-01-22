@@ -1,6 +1,7 @@
 package com.kero.browser
 
-import android.content.DialogInterface
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -13,7 +14,6 @@ import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
 
-// 定义一个简单的类，用来保存每个标签页的信息
 data class Tab(
     val session: GeckoSession,
     var title: String = "New Tab",
@@ -25,9 +25,11 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private var sRuntime: GeckoRuntime? = null
         private const val HOME_URL = "https://bing.com"
+        private const val PREFS_NAME = "KeroBrowserPrefs"
+        private const val KEY_TAB_URLS = "tab_urls"
+        private const val KEY_CURRENT_INDEX = "current_tab_index"
     }
 
-    // 这里改成存储 Tab 对象，而不是原始的 Session
     private val tabs = ArrayList<Tab>()
     private var currentTabIndex = -1
 
@@ -35,11 +37,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var urlInput: EditText
     private lateinit var progressBar: ProgressBar
     private lateinit var tabsButton: Button
+    private lateinit var prefs: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // 1. 初始化
         geckoView = findViewById(R.id.geckoview)
         urlInput = findViewById(R.id.address_bar)
         progressBar = findViewById(R.id.progress_bar)
@@ -48,24 +52,77 @@ class MainActivity : AppCompatActivity() {
         val backButton = findViewById<Button>(R.id.btn_back)
         val forwardButton = findViewById<Button>(R.id.btn_forward)
 
+        prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
         if (sRuntime == null) {
+            // 使用默认配置创建 Runtime，它会自动把 Cookie/Cache 存在 /data/data/com.kero.browser/ 下
+            // 这就是为什么 Cookie 其实是生效的，只是之前 Tab 丢了
             sRuntime = GeckoRuntime.create(this)
         }
 
-        createNewTab(HOME_URL)
+        // 2. 尝试恢复上次的标签页
+        val restored = restoreTabs()
+        if (!restored) {
+            // 如果没存档，就新建一个主页
+            createNewTab(HOME_URL)
+        }
 
+        // 3. 事件绑定
         goButton.setOnClickListener { loadUrlFromInput() }
         urlInput.setOnEditorActionListener { _, _, _ -> 
             loadUrlFromInput()
             true 
         }
 
-        // 修复：直接调用 goBack/goForward，不检查 canGoBack (API 不支持)
         backButton.setOnClickListener { getCurrentSession()?.goBack() }
         forwardButton.setOnClickListener { getCurrentSession()?.goForward() }
-
         tabsButton.setOnClickListener { showTabSwitcher() }
     }
+
+    // --- 生命周期管理 (自动存档) ---
+
+    override fun onPause() {
+        super.onPause()
+        saveTabs() // 切到后台或退出时，自动保存
+    }
+
+    private fun saveTabs() {
+        // 简单的序列化：把所有 URL 用 | 符号拼起来
+        // 例如: "https://bing.com|https://bilibili.com"
+        val urls = tabs.joinToString("|") { it.url }
+        
+        prefs.edit()
+            .putString(KEY_TAB_URLS, urls)
+            .putInt(KEY_CURRENT_INDEX, currentTabIndex)
+            .apply()
+    }
+
+    private fun restoreTabs(): Boolean {
+        val urlString = prefs.getString(KEY_TAB_URLS, "") ?: ""
+        if (urlString.isEmpty()) return false
+
+        val savedUrls = urlString.split("|")
+        if (savedUrls.isEmpty()) return false
+
+        // 恢复所有 Tab
+        for (url in savedUrls) {
+            if (url.isNotEmpty()) {
+                createNewTab(url, switchToIt = false)
+            }
+        }
+
+        // 恢复选中的 Tab
+        val savedIndex = prefs.getInt(KEY_CURRENT_INDEX, 0)
+        if (savedIndex >= 0 && savedIndex < tabs.size) {
+            switchToTab(savedIndex)
+        } else if (tabs.isNotEmpty()) {
+            switchToTab(tabs.size - 1)
+        }
+        
+        return true
+    }
+
+    // --- 核心逻辑区 ---
 
     private fun getCurrentTab(): Tab? {
         if (currentTabIndex >= 0 && currentTabIndex < tabs.size) {
@@ -78,19 +135,21 @@ class MainActivity : AppCompatActivity() {
         return getCurrentTab()?.session
     }
 
-    private fun createNewTab(url: String) {
+    // 增加 switchToIt 参数，批量恢复时不需要每次都切屏
+    private fun createNewTab(url: String, switchToIt: Boolean = true) {
         val session = GeckoSession()
         session.open(sRuntime!!)
         
-        val newTab = Tab(session)
-        
-        // 绑定监听器
+        val newTab = Tab(session, url = url) // 初始 URL 记下来
         initSessionListeners(newTab)
         
         tabs.add(newTab)
-        switchToTab(tabs.size - 1)
         
         session.loadUri(url)
+        
+        if (switchToIt) {
+            switchToTab(tabs.size - 1)
+        }
         updateTabsButton()
     }
 
@@ -103,7 +162,6 @@ class MainActivity : AppCompatActivity() {
         geckoView.releaseSession()
         geckoView.setSession(tab.session)
         
-        // 修复：从我们自己记录的 tab.url 获取网址
         urlInput.setText(tab.url)
         updateTabsButton()
     }
@@ -124,9 +182,9 @@ class MainActivity : AppCompatActivity() {
             switchToTab(currentTabIndex)
         }
         updateTabsButton()
+        saveTabs() // 关闭标签时也顺手存一下
     }
 
-    // 这里传入的是 Tab 对象，方便我们更新 Tab 里的数据
     private fun initSessionListeners(tab: Tab) {
         val session = tab.session
         
@@ -143,11 +201,9 @@ class MainActivity : AppCompatActivity() {
 
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onLocationChange(session: GeckoSession, url: String?, perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>) {
-                // 修复：把网址记在 Tab 对象里
                 if (url != null) {
-                    tab.url = url
+                    tab.url = url // 实时更新内存中的 URL
                 }
-                
                 if (session == getCurrentSession() && url != null) {
                     runOnUiThread {
                         if (!urlInput.hasFocus()) {
@@ -156,13 +212,10 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            
-            // 可选：监听标题变化（如果有需要）
         }
     }
 
     private fun showTabSwitcher() {
-        // 修复：使用 tab.url 或 tab.title 作为列表标题
         val titles = tabs.mapIndexed { index, tab -> 
             val displayTitle = if (tab.url.isNotEmpty()) tab.url else "New Tab"
             "${index + 1}. $displayTitle"
@@ -208,7 +261,6 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         val session = getCurrentSession()
         if (session != null) {
-             // 修复：直接调用 goBack，不检查 canGoBack
              session.goBack()
         } else {
              super.onBackPressed()
