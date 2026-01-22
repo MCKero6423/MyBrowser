@@ -37,13 +37,26 @@
             android:insetBottom="0dp"
             android:layout_marginStart="2dp"/>
 
+        <!-- 刷新/停止 (新) -->
+        <Button
+            android:id="@+id/btn_refresh"
+            android:layout_width="35dp"
+            android:layout_height="match_parent"
+            android:text="↻"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:padding="0dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:layout_marginStart="2dp"/>
+
         <!-- 地址栏 -->
         <EditText
             android:id="@+id/address_bar"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:hint="Search or enter address"
+            android:hint="Search"
             android:inputType="textUri"
             android:imeOptions="actionGo"
             android:background="@android:color/white"
@@ -52,7 +65,7 @@
             android:textSize="14sp"
             android:layout_marginStart="4dp"/>
 
-        <!-- 多窗口按钮 (新) -->
+        <!-- 多窗口按钮 -->
         <Button
             android:id="@+id/btn_tabs"
             android:layout_width="40dp"

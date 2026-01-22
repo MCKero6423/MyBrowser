@@ -7,7 +7,6 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import org.mozilla.geckoview.GeckoRuntime
@@ -17,7 +16,8 @@ import org.mozilla.geckoview.GeckoView
 data class Tab(
     val session: GeckoSession,
     var title: String = "New Tab",
-    var url: String = ""
+    var url: String = "",
+    var isLoading: Boolean = false // 新增：记录该页面是否正在加载
 )
 
 class MainActivity : AppCompatActivity() {
@@ -37,17 +37,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var urlInput: EditText
     private lateinit var progressBar: ProgressBar
     private lateinit var tabsButton: Button
+    private lateinit var refreshButton: Button // 新按钮
     private lateinit var prefs: SharedPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. 初始化
+        // 1. 初始化控件
         geckoView = findViewById(R.id.geckoview)
         urlInput = findViewById(R.id.address_bar)
         progressBar = findViewById(R.id.progress_bar)
         tabsButton = findViewById(R.id.btn_tabs)
+        refreshButton = findViewById(R.id.btn_refresh) // 获取实例
         val goButton = findViewById<Button>(R.id.go_button)
         val backButton = findViewById<Button>(R.id.btn_back)
         val forwardButton = findViewById<Button>(R.id.btn_forward)
@@ -55,19 +57,14 @@ class MainActivity : AppCompatActivity() {
         prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
         if (sRuntime == null) {
-            // 使用默认配置创建 Runtime，它会自动把 Cookie/Cache 存在 /data/data/com.kero.browser/ 下
-            // 这就是为什么 Cookie 其实是生效的，只是之前 Tab 丢了
             sRuntime = GeckoRuntime.create(this)
         }
 
-        // 2. 尝试恢复上次的标签页
-        val restored = restoreTabs()
-        if (!restored) {
-            // 如果没存档，就新建一个主页
+        if (!restoreTabs()) {
             createNewTab(HOME_URL)
         }
 
-        // 3. 事件绑定
+        // 2. 事件绑定
         goButton.setOnClickListener { loadUrlFromInput() }
         urlInput.setOnEditorActionListener { _, _, _ -> 
             loadUrlFromInput()
@@ -77,20 +74,28 @@ class MainActivity : AppCompatActivity() {
         backButton.setOnClickListener { getCurrentSession()?.goBack() }
         forwardButton.setOnClickListener { getCurrentSession()?.goForward() }
         tabsButton.setOnClickListener { showTabSwitcher() }
+        
+        // 3. 刷新/停止按钮逻辑
+        refreshButton.setOnClickListener {
+            val tab = getCurrentTab() ?: return@setOnClickListener
+            if (tab.isLoading) {
+                tab.session.stop() // 正在加载 -> 停止
+                // 视觉上立即变回刷新，虽然 progressDelegate 也会回调，但这样响应更快
+                refreshButton.text = "↻"
+            } else {
+                tab.session.reload() // 没在加载 -> 刷新
+                refreshButton.text = "✕"
+            }
+        }
     }
-
-    // --- 生命周期管理 (自动存档) ---
 
     override fun onPause() {
         super.onPause()
-        saveTabs() // 切到后台或退出时，自动保存
+        saveTabs()
     }
 
     private fun saveTabs() {
-        // 简单的序列化：把所有 URL 用 | 符号拼起来
-        // 例如: "https://bing.com|https://bilibili.com"
         val urls = tabs.joinToString("|") { it.url }
-        
         prefs.edit()
             .putString(KEY_TAB_URLS, urls)
             .putInt(KEY_CURRENT_INDEX, currentTabIndex)
@@ -100,29 +105,22 @@ class MainActivity : AppCompatActivity() {
     private fun restoreTabs(): Boolean {
         val urlString = prefs.getString(KEY_TAB_URLS, "") ?: ""
         if (urlString.isEmpty()) return false
-
         val savedUrls = urlString.split("|")
         if (savedUrls.isEmpty()) return false
 
-        // 恢复所有 Tab
         for (url in savedUrls) {
             if (url.isNotEmpty()) {
                 createNewTab(url, switchToIt = false)
             }
         }
-
-        // 恢复选中的 Tab
         val savedIndex = prefs.getInt(KEY_CURRENT_INDEX, 0)
         if (savedIndex >= 0 && savedIndex < tabs.size) {
             switchToTab(savedIndex)
         } else if (tabs.isNotEmpty()) {
             switchToTab(tabs.size - 1)
         }
-        
         return true
     }
-
-    // --- 核心逻辑区 ---
 
     private fun getCurrentTab(): Tab? {
         if (currentTabIndex >= 0 && currentTabIndex < tabs.size) {
@@ -135,16 +133,14 @@ class MainActivity : AppCompatActivity() {
         return getCurrentTab()?.session
     }
 
-    // 增加 switchToIt 参数，批量恢复时不需要每次都切屏
     private fun createNewTab(url: String, switchToIt: Boolean = true) {
         val session = GeckoSession()
         session.open(sRuntime!!)
         
-        val newTab = Tab(session, url = url) // 初始 URL 记下来
+        val newTab = Tab(session, url = url)
         initSessionListeners(newTab)
         
         tabs.add(newTab)
-        
         session.loadUri(url)
         
         if (switchToIt) {
@@ -163,7 +159,15 @@ class MainActivity : AppCompatActivity() {
         geckoView.setSession(tab.session)
         
         urlInput.setText(tab.url)
+        
+        // 切换标签时，更新刷新按钮的状态
+        updateRefreshButtonState(tab.isLoading)
         updateTabsButton()
+    }
+
+    // 封装更新按钮图标的逻辑
+    private fun updateRefreshButtonState(isLoading: Boolean) {
+        refreshButton.text = if (isLoading) "✕" else "↻"
     }
 
     private fun closeTab(index: Int) {
@@ -182,7 +186,7 @@ class MainActivity : AppCompatActivity() {
             switchToTab(currentTabIndex)
         }
         updateTabsButton()
-        saveTabs() // 关闭标签时也顺手存一下
+        saveTabs()
     }
 
     private fun initSessionListeners(tab: Tab) {
@@ -190,10 +194,15 @@ class MainActivity : AppCompatActivity() {
         
         session.progressDelegate = object : GeckoSession.ProgressDelegate {
             override fun onProgressChange(session: GeckoSession, progress: Int) {
+                // 更新 Tab 状态
+                tab.isLoading = (progress < 100)
+
                 if (session == getCurrentSession()) {
                     runOnUiThread {
                         progressBar.progress = progress
                         progressBar.visibility = if (progress < 100) View.VISIBLE else View.INVISIBLE
+                        // 实时更新按钮状态
+                        updateRefreshButtonState(tab.isLoading)
                     }
                 }
             }
@@ -202,7 +211,7 @@ class MainActivity : AppCompatActivity() {
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
             override fun onLocationChange(session: GeckoSession, url: String?, perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>) {
                 if (url != null) {
-                    tab.url = url // 实时更新内存中的 URL
+                    tab.url = url
                 }
                 if (session == getCurrentSession() && url != null) {
                     runOnUiThread {
